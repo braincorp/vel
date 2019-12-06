@@ -6,14 +6,13 @@ Under MIT license.
 """
 import numpy as np
 
-import torch
 import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
 
 import vel.util.network as net_util
 
-from vel.api.base import LinearBackboneModel, ModelFactory
+from vel.api import LinearBackboneModel, ModelFactory
 
 
 class NatureCnn(LinearBackboneModel):
@@ -44,17 +43,14 @@ class NatureCnn(LinearBackboneModel):
             stride=1
         )
 
-        self.final_width = net_util.convolutional_layer_series(input_width, [
+        layer_series = [
             (8, 0, 4),
             (4, 0, 2),
             (3, 0, 1)
-        ])
+        ]
 
-        self.final_height = net_util.convolutional_layer_series(input_height, [
-            (8, 0, 4),
-            (4, 0, 2),
-            (3, 0, 1)
-        ])
+        self.final_width = net_util.convolutional_layer_series(input_width, layer_series)
+        self.final_height = net_util.convolutional_layer_series(input_height, layer_series)
 
         self.linear_layer = nn.Linear(
             self.final_width * self.final_height * 64,  # 64 is the number of channels of the last conv layer
@@ -79,7 +75,7 @@ class NatureCnn(LinearBackboneModel):
                 init.constant_(m.bias, 0.0)
 
     def forward(self, image):
-        result = image.permute(0, 3, 1, 2).contiguous().type(torch.float) / 255.0
+        result = image
         result = F.relu(self.conv1(result))
         result = F.relu(self.conv2(result))
         result = F.relu(self.conv3(result))
@@ -88,6 +84,7 @@ class NatureCnn(LinearBackboneModel):
 
 
 def create(input_width, input_height, input_channels=1, output_dim=512):
+    """ Vel factory function """
     def instantiate(**_):
         return NatureCnn(
             input_width=input_width, input_height=input_height, input_channels=input_channels,
@@ -97,6 +94,5 @@ def create(input_width, input_height, input_channels=1, output_dim=512):
     return ModelFactory.generic(instantiate)
 
 
-# Add this to make nicer scripting interface
+# Scripting interface
 NatureCnnFactory = create
-

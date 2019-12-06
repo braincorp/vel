@@ -1,4 +1,4 @@
-# Vel
+# Vel 0.3
 
 [![Build Status](https://travis-ci.org/MillionIntegrals/vel.svg?branch=master)](https://travis-ci.org/MillionIntegrals/vel)
 [![PyPI version](https://badge.fury.io/py/vel.svg)](https://badge.fury.io/py/vel)
@@ -6,9 +6,18 @@
 [![Gitter chat](https://badges.gitter.im/MillionIngegrals/vel.png)](https://gitter.im/deep-learning-vel)
 
 
-Bring **velocity** to deep-learning research,
-by providing tried and tested large pool of prebuilt components that are 
-known to be working well together.
+Bring **velocity** to deep-learning research.
+
+
+This project hosts a collection of **highly modular** deep learning components that are tested to be working well together.
+A simple yaml-based system ties these modules together declaratively using configuration files,
+but everything that can be defined using config files can be coded directly in the python script as well.
+
+
+This is still an early version and a hobby project so documentation is unfortunately nonexistent. I've tried to make the
+code as clear as possible, and provide many usage examples, but whenever there was a tradeoff to be made between 
+simplicity and modularity I've chosen modularity first and simplicity second.
+
 
 Having conducted a few research projects, I've gathered a small collection of repositories 
 lying around with various model implementations suited to a particular usecase. 
@@ -16,33 +25,37 @@ Usually, starting a new project involved copying pieces of code from
 one or multiple of these past experiments, gluing, tweaking and debugging
 them until the code started working in a new setting. 
 
+
 After repeating that pattern multiple times, I've decided that this is the
 time to bite the bullet and start organising deep learning models
 into a structure that is designed to be reused rather than copied over.
+
 
 As a goal, it should be enough to write a config file that
 wires existing components together and defines their hyperparameters
 for most common applications.
 If that's not the case few bits of custom glue code should do the job.
 
+
 This repository is still in an early stage of that journey but it will grow
 as I'll be putting work into it.
+
 
 # Blogposts
 
 - https://blog.millionintegrals.com/vel-pytorch-meets-baselines/
 
+
 # How to run it 
 
-Although possible to install from `pip`, while this project is under active development
-`pip` versions may be behind current repository head.
-It is advised to install latest version by running
+Project can be installed from PyPi via `pip install vel` but also can be checked out from github
+and installed directly by running
 ```bash
 pip install -e .
 ```
 from the repository root directory.
 
-This project requires Python 3.6 and PyTorch 0.4.1.
+This project requires Python at least 3.6 and PyTorch 1.0.
 If you want to run YAML config examples, you'll also need a **project configuration file**
 `.velproject.yaml`. An example is included in this repository.
 
@@ -60,16 +73,15 @@ To use it, just rename it to `.velproject.yaml`.
 
 - Models should be runnable from the configuration files
   that are easy to store in version control, generate automatically and diff.
-  Codebase should be generic and not contain any of the model hyperparameters.
+  Codebase should be generic and do not contain any of the model hyperparameters.
   Unless user intervenes, it should be obvious which model was run
   with which hyperparameters and what output it gave.
 - The amount of "magic" in the framework should be limited and it should be easy to
   understand what exactly the model is doing for newcomers already comfortable with PyTorch. 
 - All state-of-the-art models should be implemented in the framework with accuracy
   matching published results.
-  Currently I'm focusing on computer vision and reinforcement learning models.
 - All common deep learning workflows should be fast to implement, while 
-  uncommon ones should be possible. At least as far as PyTorch allows.
+  uncommon ones should be possible, at least as far as PyTorch allows.
   
   
 # Implemented models - Computer Vision
@@ -91,15 +103,21 @@ that are ready to run and easy to modify for other similar usecases:
 
 - Continuous and discrete action spaces
 - Basic support for LSTM policies for A2C and PPO
-- Advantage Actor-Critic (A2C),
-  Proximal Policy Optimization (PPO), 
-  Trust Region Policy Optimization (TRPO),
-  Deep Deterministic Policy Gradient (DDPG),
-  and 
-  Actor-Critic with Experience Replay (ACER)
-  policy gradient reinforcement learning algorithms.
+- Following published policy gradient reinforcement learning algorithms:
+    - Advantage Actor-Critic (A2C)
+    - Deep Deterministic Policy Gradient (DDPG)
+    - Proximal Policy Optimization (PPO)
+    - Trust Region Policy Optimization (TRPO)
+    - Actor-Critic with Experience Replay (ACER)
 - Deep Q-Learning (DQN) as described by DeepMind in their Nature publication with following 
-  improvements: Double DQN, Dueling DQN, Prioritized experience replay.
+  improvements:
+    - Double DQN
+    - Dueling DQN
+    - Prioritized experience replay
+    - N-Step Bellman updates
+    - Distributional Q-Learning
+    - Noisy Networks for Exploration
+    - Rainbow (combination of the above)
 
 
 # Examples
@@ -147,15 +165,17 @@ from vel.util.random import set_seed
 from vel.rl.env.classic_atari import ClassicAtariEnv
 from vel.rl.vecenv.subproc import SubprocVecEnvWrapper
 
-from vel.rl.models.policy_gradient_model import PolicyGradientModelFactory
+from vel.modules.input.image_to_tensor import ImageToTensorFactory
+from vel.rl.models.stochastic_policy_model import StochasticPolicyModelFactory
 from vel.rl.models.backbone.nature_cnn import NatureCnnFactory
+
 
 from vel.rl.reinforcers.on_policy_iteration_reinforcer import (
     OnPolicyIterationReinforcer, OnPolicyIterationReinforcerSettings
 )
 
 from vel.rl.algo.policy_gradient.a2c import A2CPolicyGradient
-from vel.rl.env_roller.vec.step_env_roller import StepEnvRoller
+from vel.rl.env_roller.step_env_roller import StepEnvRoller
 
 from vel.api.info import TrainingInfo, EpochInfo
 
@@ -176,7 +196,8 @@ def breakout_a2c():
     # Again, use a helper to create a model
     # But because model is owned by the reinforcer, model should not be accessed using this variable
     # but from reinforcer.model property
-    model = PolicyGradientModelFactory(
+    model = StochasticPolicyModelFactory(
+        input_block=ImageToTensorFactory(),
         backbone=NatureCnnFactory(input_width=84, input_height=84, input_channels=4)
     ).instantiate(action_space=vec_env.action_space)
 
@@ -184,20 +205,19 @@ def breakout_a2c():
     reinforcer = OnPolicyIterationReinforcer(
         device=device,
         settings=OnPolicyIterationReinforcerSettings(
-            discount_factor=0.99,
-            batch_size=256
+            batch_size=256,
+            number_of_steps=5,
         ),
         model=model,
         algo=A2CPolicyGradient(
             entropy_coefficient=0.01,
             value_coefficient=0.5,
-            max_grad_norm=0.5
+            max_grad_norm=0.5,
+            discount_factor=0.99,
         ),
         env_roller=StepEnvRoller(
             environment=vec_env,
             device=device,
-            number_of_steps=5,
-            discount_factor=0.99,
         )
     )
 
@@ -268,6 +288,36 @@ If there is anything you'd like to see there, feel free to open an issue or make
 # Bibliography
 
 For a more or less exhaustive bibliography please refer to [Bibliography](docs/Bibliography.md).
+
+
+# Roadmap
+
+For each major version I'll try to keep master branch stable together with what's
+currently published on PyPI. At the same time I'll proceed with implementing new
+features on a release branch that will be merged after the testing is done and
+a release is ready.
+
+Below is a hypothetical set of features I somehow speculate to include in version
+0.4 of Vel:
+
+Very likely to be included:
+- Neural machine translation using RNNs and Transformer Networks
+- Soft actor-critic
+- Twin Delayed DDPG
+
+
+Possible to be included:
+- Popart reward normalization
+- Parameter Space Noise for Exploration
+- Hindsight experience replay
+- Generative adversarial networks
+
+
+Code quality:
+- Rename models to policies
+- Force dictionary inputs and outputs for policies
+- Factor action noise back into the policy
+- Use linter as a part of the build process
 
 
 # Alternatives, similar projects

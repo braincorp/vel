@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.init as init
 
@@ -13,8 +12,9 @@ class QHead(nn.Module):
         # Q-function requires a discrete action space
         assert isinstance(action_space, spaces.Discrete)
 
-        self.linear_layer = nn.Linear(input_dim, action_space.n)
         self.action_space = action_space
+
+        self.linear_layer = nn.Linear(input_dim, action_space.n)
 
     def reset_weights(self):
         init.orthogonal_(self.linear_layer.weight, gain=1.0)

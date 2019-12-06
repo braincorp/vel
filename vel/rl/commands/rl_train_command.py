@@ -1,9 +1,7 @@
-import torch
 import typing
 
-from vel.api import ModelConfig, EpochInfo, TrainingInfo, BatchInfo
-from vel.api.base import OptimizerFactory, Storage, Callback
-from vel.rl.api.base import ReinforcerFactory
+from vel.api import ModelConfig, EpochInfo, TrainingInfo, BatchInfo, OptimizerFactory, Storage, Callback
+from vel.rl.api import ReinforcerFactory
 from vel.callbacks.time_tracker import TimeTracker
 
 import vel.openai.baselines.logger as openai_logger
@@ -33,8 +31,14 @@ class FrameTracker(Callback):
     def write_state_dict(self, training_info: TrainingInfo, hidden_state_dict: dict):
         hidden_state_dict['frame_tracker/frames'] = training_info['frames']
 
+        if 'total_frames' in training_info:
+            hidden_state_dict['frame_tracker/total_frames'] = training_info['total_frames']
+
     def load_state_dict(self, training_info: TrainingInfo, hidden_state_dict: dict):
         training_info['frames'] = hidden_state_dict['frame_tracker/frames']
+
+        if 'frame_tracker/total_frames' in hidden_state_dict:
+            training_info['total_frames'] = hidden_state_dict['frame_tracker/total_frames']
 
 
 class RlTrainCommand:
@@ -57,7 +61,8 @@ class RlTrainCommand:
 
     def run(self):
         """ Run reinforcement learning algorithm """
-        device = torch.device(self.model_config.device)
+        device = self.model_config.torch_device()
+
         # Reinforcer is the learner for the reinforcement learning model
         reinforcer = self.reinforcer.instantiate(device)
         optimizer = self.optimizer_factory.instantiate(reinforcer.model)
@@ -128,7 +133,8 @@ class RlTrainCommand:
             training_info.initialize()
             reinforcer.initialize_training(training_info)
         else:
-            self.storage.resume(training_info, reinforcer.model)
+            model_state, hidden_state = self.storage.load(training_info)
+            reinforcer.initialize_training(training_info, model_state, hidden_state)
 
         return training_info
 
@@ -144,10 +150,9 @@ class RlTrainCommand:
         openai_logger.dump_tabular()
 
 
-def create(model_config, reinforcer, optimizer, storage,
-           # Settings:
-           total_frames, batches_per_epoch,  callbacks=None, scheduler=None, openai_logging=False):
-    """ Create reinforcement learning pipeline """
+def create(model_config, reinforcer, optimizer, storage, total_frames, batches_per_epoch,
+           callbacks=None, scheduler=None, openai_logging=False):
+    """ Vel factory function """
     from vel.openai.baselines import logger
     logger.configure(dir=model_config.openai_dir())
 

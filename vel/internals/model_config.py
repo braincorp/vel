@@ -30,7 +30,8 @@ class ModelConfig:
                 return ModelConfig.find_project_directory(up_path)
 
     @classmethod
-    def from_file(cls, filename: str, run_number: int, continue_training=False, seed: int=None, device: str='cuda', params=None):
+    def from_file(cls, filename: str, run_number: int, continue_training: bool = False, seed: int = None,
+                  device: str = 'cuda', params=None):
         """ Create model config from file """
         with open(filename, 'r') as fp:
             model_config_contents = Parser.parse(fp)
@@ -45,14 +46,7 @@ class ModelConfig:
             **model_config_contents
         }
 
-        # Options that should exist for every config
-        try:
-            model_name = model_config_contents['name']
-        except KeyError:
-            raise VelInitializationException("Model configuration must have a 'name' key")
-
         return ModelConfig(
-            model_name=model_name,
             filename=filename,
             configuration=aggregate_dictionary,
             run_number=run_number,
@@ -64,11 +58,10 @@ class ModelConfig:
         )
 
     @classmethod
-    def from_memory(cls, model_name: str, model_data: dict, run_number: int, project_dir: str,
-                    continue_training=False, seed: int=None, device: str='cuda', params=None):
+    def from_memory(cls, model_data: dict, run_number: int, project_dir: str,
+                    continue_training=False, seed: int = None, device: str = 'cuda', params=None):
         """ Create model config from supplied data """
         return ModelConfig(
-            model_name=model_name,
             filename="[memory]",
             configuration=model_data,
             run_number=run_number,
@@ -79,9 +72,8 @@ class ModelConfig:
             parameters=params
         )
 
-    def __init__(self, model_name: str, filename: str, configuration: dict, run_number: int, project_dir: str,
-                 continue_training=False, seed: int=None, device: str= 'cuda', parameters=None):
-        self._model_name = model_name
+    def __init__(self, filename: str, configuration: dict, run_number: int, project_dir: str,
+                 continue_training=False, seed: int = None, device: str = 'cuda', parameters=None):
         self.filename = filename
         self.device = device
         self.continue_training = continue_training
@@ -98,6 +90,7 @@ class ModelConfig:
             del self.contents['commands']
 
         self.provider = Provider(self._prepare_environment(), {'model_config': self}, parameters=parameters)
+        self._model_name = self.provider.get("name")
 
     def _prepare_environment(self) -> dict:
         """ Return full environment for dependency injection """
@@ -156,7 +149,8 @@ class ModelConfig:
         """ Return name of the model """
         return self._model_name
 
-    @property
+    ####################################################################################################################
+    # MISC GETTERS
     def torch_device(self):
         """ Return torch device object """
         import torch
@@ -177,7 +171,8 @@ class ModelConfig:
     def banner(self, command_name) -> None:
         """ Print a banner for running the system """
         import torch
-        device = self.torch_device
+        device = self.torch_device()
+
         print("=" * 80)
         print(f"Pytorch version: {torch.__version__} cuda version {torch.version.cuda} cudnn version {torch.backends.cudnn.version()}")
         print("Running model {}, run {} -- command {} -- device {}".format(self._model_name, self.run_number, command_name, self.device))

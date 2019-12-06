@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
 
-import gym.spaces as spaces
+from bc_gym_planning_env.envs.base import spaces
 
 
 class DiagGaussianActionHead(nn.Module):
@@ -160,7 +160,14 @@ class ActionHead(nn.Module):
 
     def sample(self, policy_params, **kwargs):
         """ Sample from a probability space of all actions """
-        return self.head.sample(policy_params, **kwargs)
+        action = self.head.sample(policy_params, **kwargs)
+        if isinstance(self.action_space, spaces.Box):
+            action[0, 0] = torch.clamp(action[0, 0], min=float(self.action_space.low[0]),
+                                       max=float(self.action_space.high[0]))
+            action[0, 1] = torch.clamp(action[0, 1], min=float(self.action_space.low[1]),
+                                       max=float(self.action_space.high[1]))
+
+        return action
 
     def reset_weights(self):
         """ Initialize weights to sane defaults """

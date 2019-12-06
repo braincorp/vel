@@ -3,8 +3,7 @@ import numpy as np
 import bisect
 import typing
 
-from vel.api import Learner, TrainingInfo, ModelConfig
-from vel.api.base import TrainPhase
+from vel.api import Learner, TrainingInfo, ModelConfig, TrainPhase
 
 
 class PhaseTrainCommand:
@@ -50,7 +49,7 @@ class PhaseTrainCommand:
 
     def run(self):
         """ Run the command with supplied configuration """
-        device = torch.device(self.model_config.device)
+        device = self.model_config.torch_device()
         learner = Learner(device, self.model_factory.instantiate())
 
         # All callbacks useful for learning
@@ -135,13 +134,14 @@ class PhaseTrainCommand:
             learner.initialize_training(training_info)
             hidden_state = None
         else:
-            hidden_state = self.storage.resume(training_info, learner.model)
+            model_state, hidden_state = self.storage.load(training_info)
+            learner.initialize_training(training_info, model_state, hidden_state)
 
         return training_info, hidden_state
 
 
 def create(model_config, model, source, storage, phases, callbacks=None, restart=True):
-    """ Vel creation function """
+    """ Vel factory function """
     return PhaseTrainCommand(
         model_config=model_config,
         model_factory=model,

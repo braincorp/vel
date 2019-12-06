@@ -17,14 +17,23 @@ def model_children(module):
 
 
 def apply_leaf(module, f):
-    c = model_children(module)
-
     if isinstance(module, nn.Module):
         f(module)
 
-    if len(c) > 0:
-        for l in c:
-            apply_leaf(l, f)
+    children = model_children(module)
+
+    for l in children:
+        apply_leaf(l, f)
+
+
+def module_apply_broadcast(m, broadcast_fn, args, kwargs):
+    if hasattr(m, broadcast_fn):
+        getattr(m, broadcast_fn)(*args, **kwargs)
+
+
+def module_broadcast(m, broadcast_fn, *args, **kwargs):
+    """ Call given function in all submodules with given parameters """
+    apply_leaf(m, lambda x: module_apply_broadcast(x, broadcast_fn, args, kwargs))
 
 
 def set_train_mode(module):

@@ -33,11 +33,14 @@ class Learner:
         """ Count model parameters """
         return sum(p.numel() for p in self.model.parameters())
 
-    def initialize_training(self, training_info: TrainingInfo):
+    def initialize_training(self, training_info: TrainingInfo, model_state=None, hidden_state=None):
         """ Prepare for training """
-        self.model.reset_weights()
+        if model_state is None:
+            self.model.reset_weights()
+        else:
+            self.model.load_state_dict(model_state)
 
-    def run_epoch(self, epoch_info: EpochInfo, source: 'vel.api.base.Source'):
+    def run_epoch(self, epoch_info: EpochInfo, source: 'vel.api.Source'):
         """ Run full epoch of learning """
         epoch_info.on_epoch_begin()
 
@@ -52,7 +55,7 @@ class Learner:
 
         epoch_info.on_epoch_end()
 
-    def train_epoch(self, epoch_info, source: 'vel.api.base.Source', interactive=True):
+    def train_epoch(self, epoch_info, source: 'vel.api.Source', interactive=True):
         """ Run a single training epoch """
         self.train()
 
@@ -70,7 +73,7 @@ class Learner:
 
             iterator.set_postfix(loss=epoch_info.result_accumulator.intermediate_value('loss'))
 
-    def validation_epoch(self, epoch_info, source: 'vel.api.base.Source'):
+    def validation_epoch(self, epoch_info, source: 'vel.api.Source'):
         """ Run a single evaluation epoch """
         self.eval()
 
